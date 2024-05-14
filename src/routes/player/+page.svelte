@@ -32,20 +32,23 @@
   const firestore = getFirestore(app);
 
   $: userDocReference =
-    user != null ? doc(firestore, "/users/" + $user?.uid) : null;
+    $user != null ? doc(firestore, "/users/" + $user!.uid) : null;
 
   $: userDoc =
-    user != null ? docStore(firestore, "/users/" + $user?.uid) : null;
+    $user != null ? docStore(firestore, "/users/" + $user!.uid) : null;
 
   $: gameFile =
-    user != null
-      ? doc(firestore, "/games/" + $userDoc.gameCode + "/" + $user?.uid)
+    $user != null && $userDoc != null
+      ? doc(firestore, "/games/" + $userDoc.gameCode + "/" + $user!.uid)
       : null;
 
   $: gameDoc =
-    userDoc != null
-      ? docStore(firestore, "/games/" + $userDoc?.gameCode)
+    $userDoc != null
+      ? docStore(firestore, "/games/" + $userDoc!.gameCode)
       : null;
+
+  console.log($user);
+  console.log($userDoc);
 
   let gameCodeInput: string = "000000";
 
@@ -89,7 +92,6 @@
             response: (r: string) => {
               signInAnonymously(auth)
                 .then(() => {
-                  console.log($user);
                   setDoc(doc(firestore, "/users/" + $user?.uid), {
                     username: r,
                     score: 0,
