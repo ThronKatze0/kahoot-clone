@@ -29,13 +29,25 @@
   const app = initializeApp(/* your firebase config */);
   const auth = getAuth(app);
   const user = userStore(auth);
-
   const firestore = getFirestore(app);
-  let gameCode: string = "000000";
-  $: gameCodePath = "/games/" + gameCode;
-  let gameCodeInput: string = "000000";
 
-  let userDoc;
+  $: userDocReference =
+    user != null ? doc(firestore, "/users/" + $user?.uid) : null;
+
+  $: userDoc =
+    user != null ? docStore(firestore, "/users/" + $user?.uid) : null;
+
+  $: gameFile =
+    user != null
+      ? doc(firestore, "/games/" + $userDoc.gameCode + "/" + $user?.uid)
+      : null;
+
+  $: gameDoc =
+    userDoc != null
+      ? docStore(firestore, "/games/" + $userDoc?.gameCode)
+      : null;
+
+  let gameCodeInput: string = "000000";
 
   let selectedOption: boolean = false;
   let option: number = 0;
@@ -78,13 +90,17 @@
               signInAnonymously(auth)
                 .then(() => {
                   console.log($user);
-                  gameCode = gameCodeInput;
-                  userDoc = docStore(
-                    firestore,
-                    gameCodePath + "/players/" + $user?.uid,
-                  );
+                  setDoc(doc(firestore, "/users/" + $user?.uid), {
+                    username: r,
+                    score: 0,
+                    selectedOption: 0,
+                    gameCode: gameCodeInput,
+                  });
                   setDoc(
-                    doc(firestore, gameCodePath + "/players/" + $user?.uid),
+                    doc(
+                      firestore,
+                      "/games/" + gameCodeInput + "/players/" + $user?.uid,
+                    ),
                     {
                       username: r,
                       score: 0,
@@ -95,7 +111,6 @@
                 .catch((error) => {
                   console.log(error);
                 });
-              return r;
             },
           });
         } else {
@@ -119,12 +134,12 @@
     let plusScore = 1000;
     console.log(paramOption, rightOption);
     if (paramOption == rightOption) {
-      updateDoc(doc(firestore, gameCodePath + "/players/" + $user?.uid), {
+      updateDoc(gameFile!, {
         selectedOption: paramOption,
         score: $userDoc?.score + plusScore,
       });
     } else {
-      updateDoc(doc(firestore, gameCodePath + "/players/" + $user?.uid), {
+      updateDoc(gameFile!, {
         selectedOption: paramOption,
       });
     }
@@ -149,13 +164,13 @@
       <button
         class="btn variant-filled"
         on:click={() => {
-          let username = joinGame();
+          joinGame();
         }}>Join</button
       >
     </div>
   </div>
 {:else}
-  <Doc ref={gameCodePath} let:data>
+  <Doc ref={$gameDoc} let:data>
     {#if data.state == "notStarted"}
       <div
         class="flex flex-col justify-center items-center min-h-screen w-full"
