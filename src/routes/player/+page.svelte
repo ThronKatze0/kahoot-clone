@@ -28,6 +28,7 @@
 
   const app = initializeApp(/* your firebase config */);
   const auth = getAuth(app);
+  signInAnonymously(auth);
   const user = userStore(auth);
   const firestore = getFirestore(app);
 
