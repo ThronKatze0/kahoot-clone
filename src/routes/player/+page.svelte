@@ -127,7 +127,7 @@
         class="btn variant-filled"
         on:click={() => {
           let username = joinGame(auth);
-          setDoc(doc(firestore, gameCodePath + "/players/" + ), {
+          setDoc(doc(firestore, gameCodePath + "/players/" + "sedf"), {
             username: username,
             score: 0,
             selectedOption: 0,
