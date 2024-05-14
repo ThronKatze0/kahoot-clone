@@ -11,13 +11,16 @@
   import { initializeApp } from "firebase/app";
   import { getAuth, signInAnonymously } from "firebase/auth";
   import {
+    DocumentReference,
     Timestamp,
     doc,
     getDoc,
     getFirestore,
     setDoc,
+    updateDoc,
   } from "firebase/firestore";
-  import { Doc, SignedIn, SignedOut, userStore } from "sveltefire";
+  import { Doc, SignedIn, SignedOut, docStore, userStore } from "sveltefire";
+  // import { clearInterval } from "timers";
 
   initializeStores();
   const toastStore = getToastStore();
@@ -31,6 +34,8 @@
   let gameCode: string = "000000";
   $: gameCodePath = "/games/" + gameCode;
   let gameCodeInput: string = "000000";
+
+  let userDoc;
 
   let selectedOption: boolean = false;
   let option: number = 0;
@@ -54,7 +59,7 @@
     });
   }
 
-  function joinGame(auth: any) {
+  async function joinGame() {
     let game = doc(firestore, "/games/" + gameCodeInput);
     getDoc(game)
       .then((gameDoc) => {
@@ -70,8 +75,26 @@
               required: true,
             },
             response: (r: string) => {
-              gameCode = gameCodeInput;
-              signInAnonymously(auth);
+              signInAnonymously(auth)
+                .then(() => {
+                  console.log($user);
+                  gameCode = gameCodeInput;
+                  userDoc = docStore(
+                    firestore,
+                    gameCodePath + "/players/" + $user?.uid,
+                  );
+                  setDoc(
+                    doc(firestore, gameCodePath + "/players/" + $user?.uid),
+                    {
+                      username: r,
+                      score: 0,
+                      selectedOption: 0,
+                    },
+                  );
+                })
+                .catch((error) => {
+                  console.log(error);
+                });
               return r;
             },
           });
@@ -96,14 +119,14 @@
     let plusScore = 1000;
     console.log(paramOption, rightOption);
     if (paramOption == rightOption) {
-      //   updateDoc(doc(firestore, gameCodePath + "/players/" + userId), {
-      //     selectedOption: paramOption,
-      //     score: $userDoc.score + plusScore,
-      //   });
-      // } else {
-      //   updateDoc(doc(firestore, gameCodePath + "/players/" + userId), {
-      //     selectedOption: paramOption,
-      //   });
+      updateDoc(doc(firestore, gameCodePath + "/players/" + $user?.uid), {
+        selectedOption: paramOption,
+        score: $userDoc?.score + plusScore,
+      });
+    } else {
+      updateDoc(doc(firestore, gameCodePath + "/players/" + $user?.uid), {
+        selectedOption: paramOption,
+      });
     }
     selectedOption = true;
     option = paramOption;
@@ -113,7 +136,7 @@
 <Toast />
 <Modal />
 
-<SignedOut let:auth>
+{#if $user == null}
   <div class="flex flex-col justify-center items-center min-h-screen w-full">
     <h1 class="h1 text-center mb-5">Enter Game Code</h1>
     <div class="flex flex-row justify-center items-center w-full">
@@ -126,18 +149,12 @@
       <button
         class="btn variant-filled"
         on:click={() => {
-          let username = joinGame(auth);
-          setDoc(doc(firestore, gameCodePath + "/players/" + ), {
-            username: username,
-            score: 0,
-            selectedOption: 0,
-          });
+          let username = joinGame();
         }}>Join</button
       >
     </div>
   </div>
-</SignedOut>
-<SignedIn let:user let:signOut>
+{:else}
   <Doc ref={gameCodePath} let:data>
     {#if data.state == "notStarted"}
       <div
@@ -240,4 +257,4 @@
       {/if}
     {/if}
   </Doc>
-</SignedIn>
+{/if}
