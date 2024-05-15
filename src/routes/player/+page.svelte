@@ -9,7 +9,11 @@
     initializeStores,
   } from "@skeletonlabs/skeleton";
   import { initializeApp } from "firebase/app";
-  import { getAuth, signInAnonymously } from "firebase/auth";
+  import {
+    getAuth,
+    onAuthStateChanged,
+    signInAnonymously,
+  } from "firebase/auth";
   import {
     DocumentReference,
     Timestamp,
@@ -20,7 +24,6 @@
     updateDoc,
   } from "firebase/firestore";
   import { Doc, SignedIn, SignedOut, docStore, userStore } from "sveltefire";
-  // import { clearInterval } from "timers";
 
   initializeStores();
   const toastStore = getToastStore();
@@ -28,28 +31,8 @@
 
   const app = initializeApp(/* your firebase config */);
   const auth = getAuth(app);
-  signInAnonymously(auth);
   const user = userStore(auth);
   const firestore = getFirestore(app);
-
-  $: userDocReference =
-    $user != null ? doc(firestore, "/users/" + $user!.uid) : null;
-
-  $: userDoc =
-    $user != null ? docStore(firestore, "/users/" + $user!.uid) : null;
-
-  $: gameFile =
-    $user != null && $userDoc != null
-      ? doc(firestore, "/games/" + $userDoc.gameCode + "/" + $user!.uid)
-      : null;
-
-  $: gameDoc =
-    $userDoc != null
-      ? docStore(firestore, "/games/" + $userDoc!.gameCode)
-      : null;
-
-  console.log($user);
-  console.log($userDoc);
 
   let gameCodeInput: string = "000000";
 
@@ -75,7 +58,7 @@
     });
   }
 
-  async function joinGame() {
+  async function joinGame(auth: any) {
     let game = doc(firestore, "/games/" + gameCodeInput);
     getDoc(game)
       .then((gameDoc) => {
@@ -127,6 +110,8 @@
   }
 
   function selectOption(
+    user: any,
+    gameCode: any,
     paramOption: number,
     rightOption: number,
     questionStartTimestamp: Timestamp,
@@ -137,12 +122,12 @@
     let plusScore = 1000;
     console.log(paramOption, rightOption);
     if (paramOption == rightOption) {
-      updateDoc(gameFile!, {
+      updateDoc(doc(firestore, "games/" + gameCode + "/players/" + user.uid), {
         selectedOption: paramOption,
-        score: $userDoc?.score + plusScore,
+        score: user.score + plusScore,
       });
     } else {
-      updateDoc(gameFile!, {
+      updateDoc(doc(firestore, "games/" + gameCode + "/players/" + user.uid), {
         selectedOption: paramOption,
       });
     }
@@ -154,7 +139,7 @@
 <Toast />
 <Modal />
 
-{#if $user == null}
+<SignedOut let:auth>
   <div class="flex flex-col justify-center items-center min-h-screen w-full">
     <h1 class="h1 text-center mb-5">Enter Game Code</h1>
     <div class="flex flex-row justify-center items-center w-full">
@@ -167,112 +152,141 @@
       <button
         class="btn variant-filled"
         on:click={() => {
-          joinGame();
+          joinGame(auth);
         }}>Join</button
       >
     </div>
   </div>
-{:else}
-  <Doc ref={$gameDoc} let:data>
-    {#if data.state == "notStarted"}
-      <div
-        class="flex flex-col justify-center items-center min-h-screen w-full"
-      >
-        <h1 class="h1 text-center">You're in! Wait until the game starts...</h1>
-      </div>
-    {:else if data.state == "questionRead"}
-      <div
-        class="flex flex-col justify-center items-center min-h-screen w-full"
-      >
-        <h1 class="h1 text-center mb-5">
-          Read the question on the big screen...
-        </h1>
-        <ProgressRadial width="w-1/4" />
-      </div>
-    {:else if data.state == "optionSelect"}
-      {#if selectedOption}
+</SignedOut>
+<SignedIn let:user>
+  <Doc ref={"/users/" + user.uid} let:data>
+    <Doc ref={"/games/" + data.gameCode} let:data>
+      {#if data.state == "notStarted"}
+        <div
+          class="flex flex-col justify-center items-center min-h-screen w-full"
+        >
+          <h1 class="h1 text-center">
+            You're in! Wait until the game starts...
+          </h1>
+        </div>
+      {:else if data.state == "questionRead"}
         <div
           class="flex flex-col justify-center items-center min-h-screen w-full"
         >
           <h1 class="h1 text-center mb-5">
-            Option submitted! Let's wait for the others to choose...
+            Read the question on the big screen...
           </h1>
           <ProgressRadial width="w-1/4" />
         </div>
-      {:else}
-        <div
-          class="grid grid-cols-2 grid-rows-2 gap-2 w-full min-w-full min-h-screen p-2"
-        >
-          <button
-            on:click={() => {
-              selectOption(0, data.currentAnswer, data.lastQuestionStart);
-            }}
-            class="bg-red-700 hover:bg-red-800 transition-all duration-200 rounded flex justify-center items-center"
+      {:else if data.state == "optionSelect"}
+        {#if selectedOption}
+          <div
+            class="flex flex-col justify-center items-center min-h-screen w-full"
           >
-            <Icon icon="uim:square-shape" width="50" height="50" />
-          </button>
-          <button
-            on:click={() => {
-              selectOption(1, data.currentAnswer, data.lastQuestionStart);
-            }}
-            class="bg-blue-700 hover:bg-blue-800 transition-all duration-200 rounded flex justify-center items-center"
+            <h1 class="h1 text-center mb-5">
+              Option submitted! Let's wait for the others to choose...
+            </h1>
+            <ProgressRadial width="w-1/4" />
+          </div>
+        {:else}
+          <div
+            class="grid grid-cols-2 grid-rows-2 gap-2 w-full min-w-full min-h-screen p-2"
+          >
+            <button
+              on:click={() => {
+                selectOption(
+                  user,
+                  data.gameCode,
+                  0,
+                  data.currentAnswer,
+                  data.lastQuestionStart,
+                );
+              }}
+              class="bg-red-700 hover:bg-red-800 transition-all duration-200 rounded flex justify-center items-center"
+            >
+              <Icon icon="uim:square-shape" width="50" height="50" />
+            </button>
+            <button
+              on:click={() => {
+                selectOption(
+                  user,
+                  data.gameCode,
+                  1,
+                  data.currentAnswer,
+                  data.lastQuestionStart,
+                );
+              }}
+              class="bg-blue-700 hover:bg-blue-800 transition-all duration-200 rounded flex justify-center items-center"
+            >
+              <Icon
+                icon="fluent-mdl2:circle-shape-solid"
+                width="50"
+                height="50"
+              />
+            </button>
+            <button
+              on:click={() => {
+                selectOption(
+                  user,
+                  data.gameCode,
+                  2,
+                  data.currentAnswer,
+                  data.lastQuestionStart,
+                );
+              }}
+              class="bg-yellow-700 hover:bg-yellow-800 transition-all duration-200 rounded flex justify-center items-center"
+            >
+              <Icon
+                icon="fluent-mdl2:triangle-shape-solid"
+                width="50"
+                height="50"
+              />
+            </button>
+            <button
+              on:click={() => {
+                selectOption(
+                  user,
+                  data.gameCode,
+                  3,
+                  data.currentAnswer,
+                  data.lastQuestionStart,
+                );
+              }}
+              class="bg-green-700 hover:bg-green-800 transition-all duration-200 rounded flex justify-center items-center"
+            >
+              <Icon icon="gis:regular-shape" width="60" height="60" />
+            </button>
+          </div>
+        {/if}
+      {:else if data.state == "selectFinished"}
+        {#if option == data.currentAnswer}
+          <div
+            class="flex flex-col justify-center items-center min-h-screen w-full"
           >
             <Icon
-              icon="fluent-mdl2:circle-shape-solid"
-              width="50"
-              height="50"
+              icon="healthicons:yes-outline"
+              color="#2ddf16"
+              width="300"
+              height="300"
             />
-          </button>
-          <button
-            on:click={() => {
-              selectOption(2, data.currentAnswer, data.lastQuestionStart);
-            }}
-            class="bg-yellow-700 hover:bg-yellow-800 transition-all duration-200 rounded flex justify-center items-center"
+            <h1 class="h1 text-center mb-5">
+              Congratulations! You picked the right option!
+            </h1>
+          </div>
+        {:else}
+          <div
+            class="flex flex-col justify-center items-center min-h-screen w-full"
           >
             <Icon
-              icon="fluent-mdl2:triangle-shape-solid"
-              width="50"
-              height="50"
+              icon="healthicons:no-outline"
+              color="#dc1818"
+              width="300"
+              height="300"
             />
-          </button>
-          <button
-            on:click={() => {
-              selectOption(3, data.currentAnswer, data.lastQuestionStart);
-            }}
-            class="bg-green-700 hover:bg-green-800 transition-all duration-200 rounded flex justify-center items-center"
-          >
-            <Icon icon="gis:regular-shape" width="60" height="60" />
-          </button>
-        </div>
+            <h1 class="h1 text-center mb-5">You picked the wrong option</h1>
+          </div>
+        {/if}
       {/if}
-    {:else if data.state == "selectFinished"}
-      {#if option == data.currentAnswer}
-        <div
-          class="flex flex-col justify-center items-center min-h-screen w-full"
-        >
-          <Icon
-            icon="healthicons:yes-outline"
-            color="#2ddf16"
-            width="300"
-            height="300"
-          />
-          <h1 class="h1 text-center mb-5">
-            Congratulations! You picked the right option!
-          </h1>
-        </div>
-      {:else}
-        <div
-          class="flex flex-col justify-center items-center min-h-screen w-full"
-        >
-          <Icon
-            icon="healthicons:no-outline"
-            color="#dc1818"
-            width="300"
-            height="300"
-          />
-          <h1 class="h1 text-center mb-5">You picked the wrong option</h1>
-        </div>
-      {/if}
-    {/if}
+    </Doc>
   </Doc>
-{/if}
+</SignedIn>
