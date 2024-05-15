@@ -109,6 +109,17 @@
       });
   }
 
+  function getScore(docRef: DocumentReference) {
+    getDoc(docRef).then((doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        return data.score;
+      } else {
+        return 0;
+      }
+    });
+  }
+
   function selectOption(
     user: any,
     gameCode: any,
@@ -116,18 +127,24 @@
     rightOption: number,
     questionStartTimestamp: Timestamp,
   ) {
+    console.log(gameCode);
+    const userDoc = doc(
+      firestore,
+      "/games/" + gameCode + "/players/" + user.uid,
+    );
+    let score = getScore(userDoc);
+    console.log(score);
     // TODO: shouldn't be hardcoded
 
     // let plusScore: number = 1000 - () * 50;
     let plusScore = 1000;
-    console.log(paramOption, rightOption);
     if (paramOption == rightOption) {
-      updateDoc(doc(firestore, "games/" + gameCode + "/players/" + user.uid), {
+      updateDoc(userDoc, {
         selectedOption: paramOption,
-        score: user.score + plusScore,
+        score: score! + plusScore,
       });
     } else {
-      updateDoc(doc(firestore, "games/" + gameCode + "/players/" + user.uid), {
+      updateDoc(userDoc, {
         selectedOption: paramOption,
       });
     }
