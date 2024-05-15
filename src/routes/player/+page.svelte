@@ -109,7 +109,7 @@
       });
   }
 
-  function getScore(docRef: DocumentReference) {
+  function getScore(docRef: DocumentReference): number {
     getDoc(docRef).then((doc) => {
       if (doc.exists()) {
         const data = doc.data();
@@ -118,6 +118,7 @@
         return 0;
       }
     });
+    return -1;
   }
 
   function selectOption(
