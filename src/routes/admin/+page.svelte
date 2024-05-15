@@ -50,12 +50,13 @@
     <h1 class="h1 mt-10 text-center">Industrielle Revolution</h1>
     <h2 class="h2 mt-20 text-center">{gameCode}</h2>
     <Collection ref={gameRef + "/players"} let:data let:count>
-      <div class="grid grid-rows-8 gap-4">
+      <h2 class="h2 mt-20 text-right mb-20">Player Count: {count}</h2>
+      <div class="grid grid-cols-5 gap-4 mx-20">
         {#each data as player}
           <div class="flex justify-between items-center">
             <div class="flex items-center">
               <Icon icon="mdi:account"></Icon>
-              <p class="ml-2">{player.name}</p>
+              <p class="ml-2">{player.username}</p>
             </div>
           </div>
         {/each}
